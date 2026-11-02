@@ -1,0 +1,104 @@
+name: sahyog
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports: ["5433:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    ports: ["6380:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    # MinIO RELEASE.2025-04-22; MinIO no longer publishes community images, so this is Bitnami's frozen build of it
+    image: bitnamilegacy/minio:2025.4.22
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports: ["9100:9000", "9101:9001"]
+    volumes:
+      - miniodata:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Downloads the embedding model once, so the API and worker never race to fetch 2 GB
+  model-init:
+    build: .
+    image: sahyog-app:dev
+    env_file: .env
+    command: python -m sahyog.ingest.embedding
+    volumes:
+      - ./sahyog:/app/sahyog
+      - models:/models
+    restart: "no"
+
+  api:
+    build: .
+    image: sahyog-app:dev
+    env_file: .env
+    environment:
+      DEV_LOGIN: "true"  # local demo only: the screens' sign-in stands in for the hospital's OIDC
+    command: uvicorn sahyog.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/sahyog
+    ports: ["8000:8000"]
+    volumes:
+      - ./sahyog:/app/sahyog
+      - ./migrations:/app/migrations
+      - ./tests:/app/tests
+      - ./alembic.ini:/app/alembic.ini
+      - ./pyproject.toml:/app/pyproject.toml:ro  # lint and test config stay current
+      - ./config:/app/config
+      - ./evals:/app/evals
+      - models:/models
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      model-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Ingest apart from the API, so OCR and embedding can't starve triage
+  worker:
+    build: .
+    image: sahyog-app:dev
+    env_file: .env
+    command: python -m sahyog.ingest.worker
+    volumes:
+      - ./sahyog:/app/sahyog
+      - ./config:/app/config
+      - models:/models
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/worker-ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 60  # loading the model takes a little while
+
+volumes:
+  pgdata:
+  miniodata:
+  models:

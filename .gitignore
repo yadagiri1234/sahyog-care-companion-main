@@ -1,0 +1,18 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+*.egg-info/
+dist/
+evals/reports/
+
+# macOS sync copies on the Desktop ("name 2.py", "name 2")
+* 2
+* 2.*
+
+# Generated sample PDFs
+evals/w2/generated/
+config/stock.csv
