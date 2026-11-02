@@ -1,0 +1,62 @@
+{
+  "name": "sahyog-care-companion",
+  "version": "0.1.0",
+  "description": "Sahyog Care Companion: agentic patient and doctor workflows",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose up --build",
+    "dev:api": "docker compose up api --build",
+    "dev:worker": "docker compose up worker --build",
+    "dev:down": "docker compose down -v",
+    "build": "docker build -t sahyog-app:latest .",
+    "build:prod": "docker build -t sahyog-app:prod --target production .",
+    "start": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d",
+    "stop": "docker compose down",
+    "logs": "docker compose logs -f",
+    "logs:api": "docker compose logs -f api",
+    "logs:worker": "docker compose logs -f worker",
+    "db:migrate": "docker compose exec api alembic upgrade head",
+    "db:revision": "docker compose exec api alembic revision --autogenerate -m",
+    "db:downgrade": "docker compose exec api alembic downgrade -1",
+    "test": "docker compose exec api pytest",
+    "test:watch": "docker compose exec api pytest -x --tb=short",
+    "lint": "docker compose exec api ruff check .",
+    "lint:fix": "docker compose exec api ruff check . --fix",
+    "format": "docker compose exec api ruff format .",
+    "typecheck": "docker compose exec api python -m py_compile sahyog/**/*.py",
+    "shell": "docker compose exec api bash",
+    "shell:worker": "docker compose exec worker bash",
+    "db:shell": "docker compose exec postgres psql -U ${POSTGRES_USER:-sahyog} -d ${POSTGRES_DB:-sahyog}",
+    "redis:cli": "docker compose exec redis redis-cli",
+    "minio:mc": "docker compose exec minio mc",
+    "deploy:staging": "echo 'Configure your staging deployment here' && exit 1",
+    "deploy:prod": "echo 'Configure your production deployment here' && exit 1",
+    "health": "curl -f http://localhost:8000/health || exit 1",
+    "clean": "docker compose down -v --rmi all && docker system prune -f"
+  },
+  "keywords": [
+    "healthcare",
+    "fastapi",
+    "patient-care",
+    "ai-agent"
+  ],
+  "author": "Sahyog Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "packageManager": "npm@9.0.0",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/sahyog-care-companion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/sahyog-care-companion/issues"
+  },
+  "homepage": "https://github.com/your-org/sahyog-care-companion#readme"
+}
